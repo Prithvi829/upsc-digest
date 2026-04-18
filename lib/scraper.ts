@@ -150,6 +150,3 @@ async function scrapeIndianExpress(): Promise<DigestStory[]> {
 
   return stories;
 }
-console.log("INSIGHTS:", insights.length);
-console.log("DRISHTI:", drishti.length);
-console.log("EXPRESS:", express.length);
