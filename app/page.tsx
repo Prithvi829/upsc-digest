@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { Digest, DigestStory, GsPaper } from "@/lib/scraper";
+import type { Digest, DigestStory } from "@/lib/scraper";
 
-const paperColors: Record<GsPaper, { bg: string; text: string }> = {
+const paperColors: Record<string, { bg: string; text: string }> = {
   GS1: { bg: "rgba(154,125,232,0.15)", text: "#b89ff0" },
   GS2: { bg: "rgba(90,143,224,0.15)", text: "#7aaae8" },
   GS3: { bg: "rgba(90,171,122,0.15)", text: "#7acf9a" },
