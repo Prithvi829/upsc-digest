@@ -173,28 +173,28 @@ async function scrapeInsightsHomepage(): Promise<DigestStory[]> {
   });
   const html = await res.text();
   const $ = cheerio.load(html);
-const stories: DigestStory[] = [];
+  const stories: DigestStory[] = [];
 
-$(".entry-title a").each((_, el) => {
-  const title = $(el).text().trim();
-  const link = $(el).attr("href");
+  $(".entry-title a").each((_, el) => {
+    const title = $(el).text().trim();
+    const link = $(el).attr("href");
 
-  if (!title || title.length < 15) return;
+    if (!title || title.length < 15) return;
 
-  stories.push({
-    title,
-    url: link || "",
-    source: "Insights IAS",
-    summary: "Click to read full article",
-    tags: [],
-    papers: ["GS2"],
-    starred: false,
+    stories.push({
+      title,
+      url: link || "",
+      source: "Insights IAS",
+      summary: "Click to read full article",
+      tags: [],
+      papers: ["GS2"],
+      starred: false,
+    });
+
+    if (stories.length >= 8) return false;
   });
 
-  if (stories.length >= 8) return false;
-});
-
-return stories;
+  return stories;
 }
 
 function getMonthName(monthIndex: number): string {
@@ -244,73 +244,65 @@ async function scrapePIB(): Promise<DigestStory[]> {
 async function scrapeIndianExpress(): Promise<DigestStory[]> {
   const url = "https://indianexpress.com/section/explained/";
 
-  try {
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const html = await res.text();
-    const $ = cheerio.load(html);
+  const res = await fetch(url);
+  const html = await res.text();
+  const $ = cheerio.load(html);
 
-    const stories: DigestStory[] = [];
+  const stories: DigestStory[] = [];
 
-    $("h2 a").each((_, el) => {
-      const title = $(el).text().trim();
-      const link = $(el).attr("href");
+  $(".articles .title a").each((_, el) => {
+    const title = $(el).text().trim();
+    const link = $(el).attr("href");
 
-      if (!title || title.length < 20) return;
+    if (!title || title.length < 15) return;
 
-      stories.push({
-        title,
-        summary: "Indian Express Explained",
-        tags: extractTags(title),
-        papers: inferPapers(title),
-        starred: inferStarred(title),
-        source: "Indian Express",
-        url: link || "",
-      });
-
-      if (stories.length >= 8) return false;
+    stories.push({
+      title,
+      summary: "Indian Express Explained",
+      tags: extractTags(title),
+      papers: inferPapers(title),
+      starred: inferStarred(title),
+      source: "Indian Express",
+      url: link || "",
     });
 
-    return stories;
-  } catch {
-    return [];
-  }
+    if (stories.length >= 5) return false;
+  });
+
+  return stories;
 }
 
 async function scrapeDrishti(): Promise<DigestStory[]> {
   const url = "https://www.drishtiias.com/current-affairs-news-analysis-editorials";
 
-  try {
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const html = await res.text();
-    const $ = cheerio.load(html);
+  const res = await fetch(url);
+  const html = await res.text();
+  const $ = cheerio.load(html);
 
-    const stories: DigestStory[] = [];
+  const stories: DigestStory[] = [];
 
-    $("a").each((_, el) => {
-      const title = $(el).text().trim();
-      const link = $(el).attr("href");
+  $(".news-card-title a").each((_, el) => {
+    const title = $(el).text().trim();
+    const link = $(el).attr("href");
 
-      if (!title || title.length < 20) return;
+    if (!title || title.length < 15) return;
 
-      stories.push({
-        title,
-        summary: "Drishti IAS current affairs",
-        tags: extractTags(title),
-        papers: inferPapers(title),
-        starred: inferStarred(title),
-        source: "Drishti IAS",
-        url: link?.startsWith("http")
-          ? link
-          : `https://www.drishtiias.com${link}`,
-      });
-
-      if (stories.length >= 8) return false;
+    stories.push({
+      title,
+      summary: "Drishti IAS",
+      tags: extractTags(title),
+      papers: inferPapers(title),
+      starred: inferStarred(title),
+      source: "Drishti IAS",
+      url: link?.startsWith("http")
+        ? link
+        : `https://www.drishtiias.com${link}`,
     });
 
-    return stories;
-  } catch {
-    return [];
-  }
+    if (stories.length >= 5) return false;
+  });
+
+  return stories;
 }
 
 export async function generateDigest(): Promise<Digest> {
@@ -320,6 +312,9 @@ export async function generateDigest(): Promise<Digest> {
     scrapeIndianExpress(),
     scrapeDrishti(),
   ]);
+  console.log("INSIGHTS:", insights.length);
+  console.log("EXPRESS:", express.length);
+  console.log("DRISHTI:", drishti.length);
 
   const allStories = [
     ...insights,
@@ -354,3 +349,4 @@ export async function generateDigest(): Promise<Digest> {
     stories: unique.slice(0, 10),
     generatedAt: new Date().toISOString(),
   };
+}
