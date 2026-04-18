@@ -1,339 +1,38 @@
 import * as cheerio from "cheerio";
 import { scoreStory, getGSTag } from "./ranker";
-export type GsPaper = "GS1" | "GS2" | "GS3" | "GS4" | "Prelims";
 
-export interface DigestStory {
+export type DigestStory = {
   title: string;
-  summary: string;
-  tags: string[];
-  papers: GsPaper[];
-  starred: boolean;
-  source: string;
   url: string;
-}
+  source: string;
+  summary: string;
+  score?: number;
+  gs?: string[];
+};
 
-export interface Digest {
+export type Digest = {
   date: string;
   stories: DigestStory[];
-  generatedAt: string;
-}
-
-// keyword → GS paper mapping
-const paperMap: { keywords: string[]; paper: GsPaper }[] = [
-  {
-    keywords: [
-      "polity", "constitution", "parliament", "supreme court", "election",
-      "governance", "bill", "act", "amendment", "fundamental rights",
-      "federalism", "panchayat", "judiciary", "lok sabha", "rajya sabha",
-      "president", "governor", "delimitation", "reservation", "tribunal",
-    ],
-    paper: "GS2",
-  },
-  {
-    keywords: [
-      "economy", "gdp", "inflation", "rbi", "budget", "tax", "infrastructure",
-      "agriculture", "industry", "trade", "exports", "imports", "startup",
-      "msme", "semiconductor", "manufacturing", "energy", "ev", "cafe",
-      "fuel", "digital", "space", "isro", "technology", "cyber", "ai",
-      "environment", "climate", "biodiversity", "forest", "pollution",
-      "wildlife", "carbon", "emission", "river", "ocean", "species",
-    ],
-    paper: "GS3",
-  },
-  {
-    keywords: [
-      "foreign policy", "bilateral", "treaty", "un", "nato", "brics", "sco",
-      "asean", "g20", "imf", "world bank", "china", "pakistan", "us",
-      "russia", "diplomacy", "sanctions", "international", "global",
-    ],
-    paper: "GS2",
-  },
-  {
-    keywords: [
-      "history", "culture", "art", "heritage", "geography", "disaster",
-      "cyclone", "earthquake", "flood", "society", "tribe", "religion",
-      "festival", "language", "migration", "urbanisation",
-    ],
-    paper: "GS1",
-  },
-  {
-    keywords: [
-      "ethics", "integrity", "corruption", "transparency", "accountability",
-      "civil service", "values", "attitude", "emotional intelligence",
-    ],
-    paper: "GS4",
-  },
-  {
-    keywords: [
-      "prelims", "species", "place in news", "index", "report", "rank",
-      "scheme", "mission", "portal", "app", "award", "summit",
-    ],
-    paper: "Prelims",
-  },
-];
-
-// starred topics — high-value for exam
-const starredKeywords = [
-  "constitution", "amendment", "supreme court", "rbi", "budget",
-  "climate", "environment", "foreign policy", "brics", "election",
-  "delimitation", "reservation", "isro", "semiconductor",
-];
-
-function inferPapers(text: string): GsPaper[] {
-  const lower = text.toLowerCase();
-  const found = new Set<GsPaper>();
-  for (const { keywords, paper } of paperMap) {
-    if (keywords.some((kw) => lower.includes(kw))) {
-      found.add(paper);
-    }
-  }
-  return found.size > 0 ? Array.from(found).slice(0, 2) : ["GS2"];
-}
-
-function inferStarred(text: string): boolean {
-  const lower = text.toLowerCase();
-  return starredKeywords.some((kw) => lower.includes(kw));
-}
-
-function extractTags(text: string): string[] {
-  const lower = text.toLowerCase();
-  const allTags = [
-    "Constitution", "Parliament", "Supreme Court", "Election Commission",
-    "RBI", "Budget", "Climate", "Environment", "ISRO", "Semiconductor",
-    "BRICS", "SCO", "G20", "Delimitation", "Women's Reservation",
-    "Federalism", "Polity", "Economy", "Biodiversity", "Cyber Security",
-    "Agriculture", "Infrastructure", "Foreign Policy", "India-China",
-    "Tribal", "Language", "Art & Culture", "Governance", "Social Sector",
-  ];
-  return allTags
-    .filter((tag) => lower.includes(tag.toLowerCase()))
-    .slice(0, 4);
-}
-
-// Scrape insightsonindia current affairs for today
-async function scrapeInsights(): Promise<DigestStory[]> {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-  const url = `https://www.insightsonindia.com/${year}/${month}/${day}/upsc-current-affairs-${day}-${getMonthName(today.getMonth())}-${year}/`;
-
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; UPSCDigestBot/1.0)" },
-    next: { revalidate: 0 },
-  });
-
-  if (!res.ok) {
-    // fallback: scrape the homepage listing
-    return scrapeInsightsHomepage();
-  }
-
-  const html = await res.text();
-  const $ = cheerio.load(html);
-  const stories: DigestStory[] = [];
-
-  // Extract h2/h3 headings as story titles with following paragraph as summary
-  $("h2, h3").each((_, el) => {
-    const title = $(el).text().trim();
-    if (title.length < 20 || title.length > 200) return;
-    if (
-      title.toLowerCase().includes("instalinks") ||
-      title.toLowerCase().includes("quiz") ||
-      title.toLowerCase().includes("click here")
-    )
-      return;
-
-    const summary =
-      $(el).next("p").text().trim().slice(0, 280) ||
-      $(el).nextAll("p").first().text().trim().slice(0, 280);
-
-    if (!summary || summary.length < 30) return;
-
-    stories.push({
-      title,
-      summary: summary + (summary.length === 280 ? "..." : ""),
-      tags: extractTags(title + " " + summary),
-      papers: inferPapers(title + " " + summary),
-      starred: inferStarred(title + " " + summary),
-      source: "Insights IAS",
-      url,
-    });
-
-    if (stories.length >= 10) return false;
-  });
-
-  return stories.slice(0, 8);
-}
-
-async function scrapeInsightsHomepage(): Promise<DigestStory[]> {
-  const url = "https://www.insightsonindia.com/current-affairs-upsc/";
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; UPSCDigestBot/1.0)" },
-    next: { revalidate: 0 },
-  });
-  const html = await res.text();
-  const $ = cheerio.load(html);
-  const stories: DigestStory[] = [];
-
-  $(".entry-title a").each((_, el) => {
-    const title = $(el).text().trim();
-    const link = $(el).attr("href");
-
-    if (!title || title.length < 15) return;
-
-    stories.push({
-      title,
-      url: link || "",
-      source: "Insights IAS",
-      summary: "Click to read full article",
-      tags: [],
-      papers: ["GS2"],
-      starred: false,
-    });
-
-    if (stories.length >= 8) return false;
-  });
-
-  return stories;
-}
-
-function getMonthName(monthIndex: number): string {
-  return [
-    "january", "february", "march", "april", "may", "june",
-    "july", "august", "september", "october", "november", "december",
-  ][monthIndex];
-}
-
-async function scrapePIB(): Promise<DigestStory[]> {
-  const url = "https://pib.gov.in/PressReleasePage.aspx";
-
-  try {
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
-    const stories: DigestStory[] = [];
-
-    $("a").each((_, el) => {
-      const title = $(el).text().trim();
-      const link = $(el).attr("href");
-
-      if (!title || title.length < 40) return;
-
-      stories.push({
-        title,
-        summary: "Government press release",
-        tags: extractTags(title),
-        papers: inferPapers(title),
-        starred: inferStarred(title),
-        source: "PIB",
-        url: link?.startsWith("http")
-          ? link
-          : `https://pib.gov.in/${link}`,
-      });
-
-      if (stories.length >= 8) return false;
-    });
-
-    return stories;
-  } catch {
-    return [];
-  }
-}
-
-async function scrapeIndianExpress(): Promise<DigestStory[]> {
-  const url = "https://indianexpress.com/section/explained/";
-
-  const res = await fetch(url);
-  const html = await res.text();
-  const $ = cheerio.load(html);
-
-  const stories: DigestStory[] = [];
-
-  $(".articles .title a").each((_, el) => {
-    const title = $(el).text().trim();
-    const link = $(el).attr("href");
-
-    if (!title || title.length < 15) return;
-
-    stories.push({
-      title,
-      summary: "Indian Express Explained",
-      tags: extractTags(title),
-      papers: inferPapers(title),
-      starred: inferStarred(title),
-      source: "Indian Express",
-      url: link || "",
-    });
-
-    if (stories.length >= 5) return false;
-  });
-
-  return stories;
-}
-
-async function scrapeDrishti(): Promise<DigestStory[]> {
-  const url = "https://www.drishtiias.com/current-affairs-news-analysis-editorials";
-
-  const res = await fetch(url);
-  const html = await res.text();
-  const $ = cheerio.load(html);
-
-  const stories: DigestStory[] = [];
-
-  $(".news-card-title a").each((_, el) => {
-    const title = $(el).text().trim();
-    const link = $(el).attr("href");
-
-    if (!title || title.length < 15) return;
-
-    stories.push({
-      title,
-      summary: "Drishti IAS",
-      tags: extractTags(title),
-      papers: inferPapers(title),
-      starred: inferStarred(title),
-      source: "Drishti IAS",
-      url: link?.startsWith("http")
-        ? link
-        : `https://www.drishtiias.com${link}`,
-    });
-
-    if (stories.length >= 5) return false;
-  });
-
-  return stories;
-}
+};
 
 export async function generateDigest(): Promise<Digest> {
-  const [insights, pib, express, drishti] = await Promise.all([
-    scrapeInsights(),
-    scrapePIB(),
-    scrapeIndianExpress(),
-    scrapeDrishti(),
-  ]);
-  console.log("INSIGHTS:", insights.length);
-  console.log("EXPRESS:", express.length);
-  console.log("DRISHTI:", drishti.length);
+  const insights = await scrapeInsights();
+  const drishti = await scrapeDrishti();
+  const express = await scrapeIndianExpress();
 
-  const allStories = [
-    ...insights,
-    ...pib,
-    ...express,
-    ...drishti,
-  ];
+  console.log("INSIGHTS:", insights.length);
+  console.log("DRISHTI:", drishti.length);
+  console.log("EXPRESS:", express.length);
+
+  const allStories = [...insights, ...drishti, ...express];
 
   const ranked = allStories
-    .map((s) => {
-      let score = scoreStory(s.title + " " + s.summary + " " + s.source);
-
-      if (s.source === "PIB") score += 3;
-      if (s.source === "Indian Express") score += 2;
-      if (s.source === "Drishti IAS") score += 1;
-
-      return { ...s, score };
-    })
-    .sort((a, b) => b.score - a.score);
+    .map((story) => ({
+      ...story,
+      score: scoreStory(story.title),
+      gs: getGSTag(story.title),
+    }))
+    .sort((a, b) => (b.score! - a.score!));
 
   const seen = new Set<string>();
 
@@ -344,9 +43,113 @@ export async function generateDigest(): Promise<Digest> {
     return true;
   });
 
+  const date = new Date().toISOString().split("T")[0];
+
   return {
-    date: new Date().toISOString().split("T")[0],
-    stories: unique.slice(0, 10),
-    generatedAt: new Date().toISOString(),
+    date,
+    stories: unique.slice(0, 8),
   };
+}
+
+// ------------------ INSIGHTS IAS ------------------
+async function scrapeInsights(): Promise<DigestStory[]> {
+  const url = "https://www.insightsonindia.com/current-affairs-upsc/";
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+    },
+    next: { revalidate: 0 },
+  });
+
+  const html = await res.text();
+  const $ = cheerio.load(html);
+
+  const stories: DigestStory[] = [];
+
+  $("article").each((_, el) => {
+    const title = $(el).find("h2, h3").first().text().trim();
+    const link = $(el).find("a").first().attr("href");
+
+    if (!title || title.length < 10) return;
+
+    stories.push({
+      title,
+      url: link || "",
+      source: "Insights IAS",
+      summary: "Click to read full article",
+    });
+
+    if (stories.length >= 20) return false;
+  });
+
+  return stories;
+}
+
+// ------------------ DRISHTI IAS ------------------
+async function scrapeDrishti(): Promise<DigestStory[]> {
+  const url = "https://www.drishtiias.com/current-affairs-news-analysis-editorials/news";
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+    },
+  });
+
+  const html = await res.text();
+  const $ = cheerio.load(html);
+
+  const stories: DigestStory[] = [];
+
+  $(".news-card").each((_, el) => {
+    const title = $(el).find("h3").text().trim();
+    const link = $(el).find("a").attr("href");
+
+    if (!title) return;
+
+    stories.push({
+      title,
+      url: link ? "https://www.drishtiias.com" + link : "",
+      source: "Drishti IAS",
+      summary: "Click to read full article",
+    });
+
+    if (stories.length >= 15) return false;
+  });
+
+  return stories;
+}
+
+// ------------------ INDIAN EXPRESS ------------------
+async function scrapeIndianExpress(): Promise<DigestStory[]> {
+  const url = "https://indianexpress.com/section/india/";
+
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0",
+    },
+  });
+
+  const html = await res.text();
+  const $ = cheerio.load(html);
+
+  const stories: DigestStory[] = [];
+
+  $("article").each((_, el) => {
+    const title = $(el).find("h2").text().trim();
+    const link = $(el).find("a").attr("href");
+
+    if (!title || title.length < 15) return;
+
+    stories.push({
+      title,
+      url: link || "",
+      source: "Indian Express",
+      summary: "Click to read full article",
+    });
+
+    if (stories.length >= 20) return false;
+  });
+
+  return stories;
 }
