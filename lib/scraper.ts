@@ -173,31 +173,28 @@ async function scrapeInsightsHomepage(): Promise<DigestStory[]> {
   });
   const html = await res.text();
   const $ = cheerio.load(html);
-  const stories: DigestStory[] = [];
+const stories: DigestStory[] = [];
 
-  $("article, .post").each((_, el) => {
-    const title = $(el).find("h2, h3, .entry-title").first().text().trim();
-    const summary = $(el).find("p").first().text().trim().slice(0, 280);
-    const link =
-      $(el).find("a").first().attr("href") ||
-      "https://www.insightsonindia.com";
+$(".entry-title a").each((_, el) => {
+  const title = $(el).text().trim();
+  const link = $(el).attr("href");
 
-    if (!title || title.length < 15) return;
+  if (!title || title.length < 15) return;
 
-    stories.push({
-      title,
-      summary: summary || "Click to read the full story.",
-      tags: extractTags(title),
-      papers: inferPapers(title),
-      starred: inferStarred(title),
-      source: "Insights IAS",
-      url: link,
-    });
-
-    if (stories.length >= 8) return false;
+  stories.push({
+    title,
+    url: link || "",
+    source: "Insights IAS",
+    summary: "Click to read full article",
+    tags: [],
+    papers: ["GS2"],
+    starred: false,
   });
 
-  return stories;
+  if (stories.length >= 8) return false;
+});
+
+return stories;
 }
 
 function getMonthName(monthIndex: number): string {
