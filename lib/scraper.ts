@@ -8,6 +8,7 @@ export type DigestStory = {
   summary: string;
   score?: number;
   gs?: string[];
+  starred?: boolean;
 };
 
 export type Digest = {
@@ -27,11 +28,16 @@ export async function generateDigest(): Promise<Digest> {
   const allStories = [...insights, ...drishti, ...express];
 
   const ranked = allStories
-    .map((story) => ({
+  .map((story) => {
+    const score = scoreStory(story.title);
+
+    return {
       ...story,
-      score: scoreStory(story.title),
+      score,
       gs: getGSTag(story.title),
-    }))
+      starred: score >= 3, // ⭐ logic
+    };
+  })
     .sort((a, b) => (b.score! - a.score!));
 
   const seen = new Set<string>();
