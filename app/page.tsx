@@ -112,11 +112,11 @@ function SectionDivider({ label }: { label: string }) {
 
 function groupByPaper(stories: DigestStory[]) {
   const sections: { label: string; stories: DigestStory[] }[] = [
-    { label: "Polity & Governance — GS 2", stories: stories.filter(s => s.papers.includes("GS2") && !s.papers.includes("GS3")) },
-    { label: "Economy & Technology — GS 3", stories: stories.filter(s => s.papers.includes("GS3")) },
-    { label: "History, Culture & Geography — GS 1", stories: stories.filter(s => s.papers.includes("GS1")) },
-    { label: "Ethics & Society — GS 4", stories: stories.filter(s => s.papers.includes("GS4")) },
-    { label: "Prelims spotlight", stories: stories.filter(s => s.papers.includes("Prelims") && !s.papers.includes("GS2") && !s.papers.includes("GS3")) },
+    { label: "Polity & Governance — GS 2", stories: stories.filter(s => s.gs?.includes("GS2") && !s.gs?.includes("GS3")) },
+    { label: "Economy & Technology — GS 3", stories: stories.filter(s => s.gs?.includes("GS3")) },
+    { label: "History, Culture & Geography — GS 1", stories: stories.filter(s => s.gs?.includes("GS1")) },
+    { label: "Ethics & Society — GS 4", stories: stories.filter(s => s.gs?.includes("GS4")) },
+    { label: "Prelims spotlight", stories: stories.filter(s => s.gs?.includes("Prelims") && !s.gs?.includes("GS2") && !s.gs?.includes("GS3")) },
   ];
   return sections.filter(s => s.stories.length > 0);
 }
@@ -238,7 +238,7 @@ export default function HomePage() {
                       {s.title}
                     </a>
                     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                      {s.papers.map(p => <Badge key={p} paper={p} />)}
+                      {s.gs?.map(p => <Badge key={p} paper={p} />)}
                     </div>
                   </div>
                 ))}
