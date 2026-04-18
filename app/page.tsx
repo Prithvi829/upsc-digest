@@ -85,12 +85,9 @@ function StoryCard({ story, index }: { story: DigestStory; index: number }) {
         {story.summary}
       </p>
 
-      {/* Tags */}
-      {story.tags.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-          {story.tags.map(t => <Tag key={t} label={t} />)}
-        </div>
-      )}
+     {false && (
+  <div></div>
+)}
     </a>
   );
 }
