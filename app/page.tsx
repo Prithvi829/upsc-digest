@@ -10,7 +10,7 @@ const paperColors: Record<string, { bg: string; text: string }> = {
   Prelims: { bg: "rgba(224,90,90,0.15)", text: "#e88080" },
 };
 
-function Badge({ paper }: { paper: GsPaper }) {
+function Badge({ paper }: { paper: string }) {
   const { bg, text } = paperColors[paper];
   return (
     <span style={{
