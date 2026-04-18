@@ -76,7 +76,7 @@ function StoryCard({ story, index }: { story: DigestStory; index: number }) {
           {story.title}
         </h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, flexShrink: 0 }}>
-          {story.papers.map(p => <Badge key={p} paper={p} />)}
+          {story.gs?.map(p => <Badge key={p} paper={p} />)}
         </div>
       </div>
 
