@@ -38,12 +38,13 @@ export async function generateDigest(): Promise<Digest> {
       starred: score >= 3, // ⭐ logic
     };
   })
-    .sort((a, b) => (b.score! - a.score!));
+  .filter((s) => s.score !== undefined)
+  .sort((a, b) => (b.score! - a.score!));
 
   const seen = new Set<string>();
 
   const unique = ranked.filter((s) => {
-    const key = s.title.toLowerCase();
+    const key = s.title.toLowerCase().slice(0, 80);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -86,7 +87,7 @@ async function scrapeInsights(): Promise<DigestStory[]> {
       summary: "Click to read full article",
     });
 
-    if (stories.length >= 20) return false;
+    if (stories.length >= 50) return false;
   });
 
   return stories;
@@ -120,7 +121,7 @@ async function scrapeDrishti(): Promise<DigestStory[]> {
       summary: "Click to read full article",
     });
 
-    if (stories.length >= 15) return false;
+    if (stories.length >= 50) return false;
   });
 
   return stories;
@@ -154,7 +155,7 @@ async function scrapeIndianExpress(): Promise<DigestStory[]> {
       summary: "Click to read full article",
     });
 
-    if (stories.length >= 20) return false;
+    if (stories.length >= 50) return false;
   });
 
   return stories;
