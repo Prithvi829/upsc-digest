@@ -95,24 +95,19 @@ async function scrapeInsights(): Promise<DigestStory[]> {
 
 // ------------------ DRISHTI IAS ------------------
 async function scrapeDrishti(): Promise<DigestStory[]> {
-  const url = "https://www.drishtiias.com/current-affairs-news-analysis-editorials/news";
+  const url = "https://www.drishtiias.com/current-affairs-news-analysis-editorials";
 
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0",
-    },
-  });
-
+  const res = await fetch(url);
   const html = await res.text();
   const $ = cheerio.load(html);
 
   const stories: DigestStory[] = [];
 
-  $(".news-card").each((_, el) => {
-    const title = $(el).find("h3").text().trim();
+  $("h3").each((_, el) => {
+    const title = $(el).text().trim();
     const link = $(el).find("a").attr("href");
 
-    if (!title) return;
+    if (!title || title.length < 20) return;
 
     stories.push({
       title,
@@ -121,7 +116,7 @@ async function scrapeDrishti(): Promise<DigestStory[]> {
       summary: "Click to read full article",
     });
 
-    if (stories.length >= 50) return false;
+    if (stories.length >= 20) return false;
   });
 
   return stories;
@@ -129,24 +124,19 @@ async function scrapeDrishti(): Promise<DigestStory[]> {
 
 // ------------------ INDIAN EXPRESS ------------------
 async function scrapeIndianExpress(): Promise<DigestStory[]> {
-  const url = "https://indianexpress.com/section/india/";
+  const url = "https://indianexpress.com/section/explained/";
 
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "Mozilla/5.0",
-    },
-  });
-
+  const res = await fetch(url);
   const html = await res.text();
   const $ = cheerio.load(html);
 
   const stories: DigestStory[] = [];
 
-  $("article").each((_, el) => {
-    const title = $(el).find("h2").text().trim();
+  $("h2").each((_, el) => {
+    const title = $(el).text().trim();
     const link = $(el).find("a").attr("href");
 
-    if (!title || title.length < 15) return;
+    if (!title || title.length < 20) return;
 
     stories.push({
       title,
@@ -155,8 +145,11 @@ async function scrapeIndianExpress(): Promise<DigestStory[]> {
       summary: "Click to read full article",
     });
 
-    if (stories.length >= 50) return false;
+    if (stories.length >= 20) return false;
   });
 
   return stories;
 }
+console.log("INSIGHTS:", insights.length);
+console.log("DRISHTI:", drishti.length);
+console.log("EXPRESS:", express.length);
