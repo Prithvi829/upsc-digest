@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-
+import { scoreStory, getGSTag } from "./ranker";
 export type GsPaper = "GS1" | "GS2" | "GS3" | "GS4" | "Prelims";
 
 export interface DigestStory {
@@ -204,18 +204,153 @@ function getMonthName(monthIndex: number): string {
   ][monthIndex];
 }
 
-export async function generateDigest(): Promise<Digest> {
-  const stories = await scrapeInsights();
+async function scrapePIB(): Promise<DigestStory[]> {
+  const url = "https://pib.gov.in/PressReleasePage.aspx";
 
-  // Ensure at least some starred stories
-  if (stories.filter((s) => s.starred).length === 0 && stories.length > 0) {
-    stories[0].starred = true;
-    if (stories[2]) stories[2].starred = true;
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    const stories: DigestStory[] = [];
+
+    $("a").each((_, el) => {
+      const title = $(el).text().trim();
+      const link = $(el).attr("href");
+
+      if (!title || title.length < 40) return;
+
+      stories.push({
+        title,
+        summary: "Government press release",
+        tags: extractTags(title),
+        papers: inferPapers(title),
+        starred: inferStarred(title),
+        source: "PIB",
+        url: link?.startsWith("http")
+          ? link
+          : `https://pib.gov.in/${link}`,
+      });
+
+      if (stories.length >= 8) return false;
+    });
+
+    return stories;
+  } catch {
+    return [];
   }
+}
+
+async function scrapeIndianExpress(): Promise<DigestStory[]> {
+  const url = "https://indianexpress.com/section/explained/";
+
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    const stories: DigestStory[] = [];
+
+    $("h2 a").each((_, el) => {
+      const title = $(el).text().trim();
+      const link = $(el).attr("href");
+
+      if (!title || title.length < 20) return;
+
+      stories.push({
+        title,
+        summary: "Indian Express Explained",
+        tags: extractTags(title),
+        papers: inferPapers(title),
+        starred: inferStarred(title),
+        source: "Indian Express",
+        url: link || "",
+      });
+
+      if (stories.length >= 8) return false;
+    });
+
+    return stories;
+  } catch {
+    return [];
+  }
+}
+
+async function scrapeDrishti(): Promise<DigestStory[]> {
+  const url = "https://www.drishtiias.com/current-affairs-news-analysis-editorials";
+
+  try {
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    const stories: DigestStory[] = [];
+
+    $("a").each((_, el) => {
+      const title = $(el).text().trim();
+      const link = $(el).attr("href");
+
+      if (!title || title.length < 20) return;
+
+      stories.push({
+        title,
+        summary: "Drishti IAS current affairs",
+        tags: extractTags(title),
+        papers: inferPapers(title),
+        starred: inferStarred(title),
+        source: "Drishti IAS",
+        url: link?.startsWith("http")
+          ? link
+          : `https://www.drishtiias.com${link}`,
+      });
+
+      if (stories.length >= 8) return false;
+    });
+
+    return stories;
+  } catch {
+    return [];
+  }
+}
+
+export async function generateDigest(): Promise<Digest> {
+  const [insights, pib, express, drishti] = await Promise.all([
+    scrapeInsights(),
+    scrapePIB(),
+    scrapeIndianExpress(),
+    scrapeDrishti(),
+  ]);
+
+  const allStories = [
+    ...insights,
+    ...pib,
+    ...express,
+    ...drishti,
+  ];
+
+  const ranked = allStories
+    .map((s) => {
+      let score = scoreStory(s.title + " " + s.summary + " " + s.source);
+
+      if (s.source === "PIB") score += 3;
+      if (s.source === "Indian Express") score += 2;
+      if (s.source === "Drishti IAS") score += 1;
+
+      return { ...s, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const seen = new Set<string>();
+
+  const unique = ranked.filter((s) => {
+    const key = s.title.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   return {
     date: new Date().toISOString().split("T")[0],
-    stories,
+    stories: unique.slice(0, 10),
     generatedAt: new Date().toISOString(),
   };
-}
